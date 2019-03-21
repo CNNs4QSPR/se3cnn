@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 # TODO: Split into radial and angular kernels
 class SE3PointTwoLayerKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, radii, radial_function=gaussian_radial_function, J_filter_max=10, radial_nonlinearity=None):
+    def __init__(self, Rs_in, Rs_out, radii, radial_function=gaussian_radial_function, J_filter_max=10, radial_nonlinearity=None, hidden_dim=10):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -30,6 +30,7 @@ class SE3PointTwoLayerKernel(torch.nn.Module):
         self.J_filter_max = J_filter_max
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
+        self.hidden_dim = hidden_dim
 
         self.radial_nonlinearity = F.relu if radial_nonlinearity is None else radial_nonlinearity
 
@@ -48,9 +49,11 @@ class SE3PointTwoLayerKernel(torch.nn.Module):
                         if J <= self.J_filter_max:
                             basis_size += 1
                             set_of_irreps.add(J)
-                self.nweights_0 += m_out * m_in * basis_size  # This depends on radial function
-                self.nbiases_0 += m_out * m_in
-                self.nweights_1 += m_out * m_in * m_out * m_in
+                #TODO: Change m_out * m_in for nweights_0 and nbiases_0 to hidden_dim
+                #TODO: Add hidden_dim as init param
+                self.nweights_0 += self.hidden_dim * basis_size  # This depends on radial function
+                self.nbiases_0 += self.hidden_dim
+                self.nweights_1 += m_out * m_in * self.hidden_dim
                 self.nbiases_1 += m_out * m_in
         self.filter_irreps = sorted(list(set_of_irreps))
 
@@ -102,15 +105,15 @@ class SE3PointTwoLayerKernel(torch.nn.Module):
                     b_size = kij.size()[1:]  # [i, j, N, M] or [i, j, batch, N, M]
 
                     # w = weight[weight_index: weight_index + m_out * m_in * b_el].view(m_out * m_in, b_el)  # [I*J, beta]
-                    w0 = weight_0[weight_0_index: weight_0_index + m_out * m_in * b_el].view(m_out * m_in, b_el)  # [I*J, beta]
-                    b0 = biases_0[bias_0_index: bias_0_index + m_out * m_in]  # [I*J]
-                    w1 = weight_1[weight_1_index: weight_1_index + m_out * m_in * m_out * m_in].view(m_out * m_in, m_out * m_in)  # [I*J, I*J]
+                    w0 = weight_0[weight_0_index: weight_0_index + self.hidden_dim * b_el].view(self.hidden_dim, b_el)  # [I*J, beta]
+                    b0 = biases_0[bias_0_index: bias_0_index + self.hidden_dim]  # [I*J]
+                    w1 = weight_1[weight_1_index: weight_1_index + m_out * m_in * self.hidden_dim].view(m_out * m_in, self.hidden_dim)  # [I*J, I*J]
                     b1 = biases_1[bias_1_index: bias_1_index + m_out * m_in]  # [I*J]
 
                     # weight_index += m_out * m_in * b_el
-                    weight_0_index += m_out * m_in * b_el
-                    bias_0_index += m_out * m_in
-                    weight_1_index += m_out * m_in * m_out * m_in
+                    weight_0_index += self.hidden_dim * b_el
+                    bias_0_index += self.hidden_dim
+                    weight_1_index += m_out * m_in * self.hidden_dim
                     bias_1_index += m_out * m_in
 
                     basis_kernels_ij = kij.contiguous().view(b_el, -1)  # [beta, i*j*N*M] or [beta, i*j*batch*N*M]
