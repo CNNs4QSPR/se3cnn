@@ -2,7 +2,6 @@
 import torch
 from se3cnn import SE3Kernel
 from se3cnn.point_kernel import SE3PointKernel
-from se3cnn.point_two_layer_kernel import SE3PointTwoLayerKernel
 from se3cnn import kernel, point_kernel
 
 
