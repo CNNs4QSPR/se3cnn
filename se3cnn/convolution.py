@@ -65,6 +65,9 @@ class SE3PointConvolution(torch.nn.Module):
 
         if len(input.size()) == 2:
             # No batch dimension
+            if relative_mask is not None:
+                # Use case: test particles in a single example
+                kernel = torch.einsum('ba,dcba->dcba', (relative_mask, kernel))
             output = torch.einsum('ca,dcba->db', (input, kernel))
         elif len(input.size()) == 3:
             # Batch dimension
