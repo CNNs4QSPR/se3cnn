@@ -159,10 +159,21 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     :param order: int
     :param xyz: tensor of shape [A, 3]
     :return: tensor of shape [m, A]
+    
+    Note, there are two uses of epsilon in this function:
+        1. prevent divide by zero of normalizing xyz
+        2. prevent divide by zero in atan2
+    We have picked out the eps used by testing against:
+        `tetris_point_backwardable.py`
+        `tetris_point_noNL_backwardable.py` (this being the most sensitive)
+        `gravity_with_backwardable.ipynb`
+    and ensuring that the gradients of the difference matrix do not contain
+    nans. There are likely more principled ways to determine this and your
+    application may require a different epsilon. 
     """
+
     norm = torch.norm(xyz, 2, -1, keepdim=True)
-    # Using this eps and masking out spherical harmonics from radii < eps
-    # are both crucial to stability.
+    xy_norm = torch.norm(xyz[..., :2], 2, -1)
     xyz = xyz / (norm + eps)
 
     plm = legendre(order, xyz[..., 2])  # [m, A]
@@ -171,7 +182,8 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     m = m.view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
     sm = 1 - m % 2 * 2  # [m, 1...]
 
-    phi = torch.atan2(xyz[..., 1], xyz[..., 0]).unsqueeze(0)  # [1, A]
+    # atan2 derivative produces NaNs for zero xy_norms.
+    phi = torch.atan2(xyz[..., 1], xyz[..., 0] + eps).unsqueeze(0)  # [1, A]
     exr = torch.cos(m * phi)  # [m, A]
     exi = torch.sin(-m * phi)  # [-m, A]
 
