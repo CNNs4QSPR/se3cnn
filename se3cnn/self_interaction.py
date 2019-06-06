@@ -41,10 +41,9 @@ class SelfInteraction(torch.nn.Module):
             # We use einsum to do transpose and tensordots at the same time
             kernel[si, sj] = torch.einsum(
                 'dc,ij->dicj', (w,
-                                torch.ones(self.dims_out[i],
-                                           self.dims_in[i]))).view(
-                                               m_out * self.dims_out[i],
-                                               m_in * self.dims_in[i])
+                                torch.eye(self.dims_out[i]))).view(
+                                    m_out * self.dims_out[i],
+                                    m_in * self.dims_in[i])
             begin_j += m_in * self.dims_in[i]
             begin_i += m_out * self.dims_out[i]
             weight_index += m_out * m_in
