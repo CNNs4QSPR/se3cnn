@@ -3,7 +3,10 @@ import se3cnn.SO3 as SO3
 import se3cnn.point_kernel_vec as pv
 import se3cnn.self_interaction as si
 import se3cnn.non_linearities as nl
+import se3cnn.test_utils as tu
+import numpy as np
 
+MAX_NB = 8
 
 class TFGRU(torch.nn.Module):
     def __init__(self, Rs_hidden):
@@ -79,7 +82,7 @@ class TFGRU(torch.nn.Module):
         h_conv_input = torch.cat(h_conv_input, -2)
         pre_h_conv = self.nl_tanh(self.self_inter_pre_h_conv(
             h_conv_input))  # [batch, Rs_hidden, 1]
-        new_h = sum_h_conv + gate_normwise_multiply(z, pre_h_conv + sum_h_conv,
+        new_h = sum_h_conv + gate_normwise_multiply(z, pre_h_conv - sum_h_conv,
                                                     self.Rs_hidden, rep_dim=-2)  # [batch, Rs_hidden, 1]
         return new_h
 
@@ -98,3 +101,34 @@ def gate_normwise_multiply(gate_tensor, target_tensor, Rs, rep_dim=-2):
         return torch.einsum('nda,dc,nca->nca', (gate_norm, scaffold, target_tensor))
     elif rep_dim == -3:
         return torch.einsum('ndba,dc,ncba->ncba', (gate_norm, scaffold, target_tensor))
+
+
+def test_rot_equiv_gru():
+    torch.set_default_dtype(torch.float64)
+
+    batch = 2
+    Rs_hidden = [(2, 0), (2, 1), (2, 2)]
+    Rs_hidden_dim = sum([m * (2 * l + 1) for m, l in Rs_hidden])
+    x = torch.randn(batch, Rs_hidden_dim, 1)
+    h_nei = torch.randn(batch, Rs_hidden_dim, MAX_NB)
+    h_nei_diff = torch.randn(batch, 1, MAX_NB, 3)
+    mask = torch.empty(batch, 1, MAX_NB).random_(2)
+
+    angles = np.random.rand(3)
+    rotation = torch.from_numpy(
+        tu.representation_wigner_matrix(angles, Rs_hidden))
+    rotation_coord_diff = SO3.rot(*angles)
+    rot_x = torch.einsum('mn,bnp->bmp', (rotation, x))
+    rot_h_nei = torch.einsum('mn,bnp->bmp', (rotation, h_nei))
+    rot_h_nei_diff = torch.einsum(
+        'mn,bopn->bopm', (rotation_coord_diff, h_nei_diff))
+
+    iamgrut = TFGRU(Rs_hidden)
+
+    out = iamgrut(x, h_nei, h_nei_diff, mask)
+    rot_out = iamgrut(rot_x, rot_h_nei, rot_h_nei_diff, mask)
+    out_rot = torch.einsum('fd,ndb->nfb', (rotation, out))
+    assert torch.allclose(out_rot, rot_out)
+
+if __name__ == "__main__":
+    test_rot_equiv_gru()
