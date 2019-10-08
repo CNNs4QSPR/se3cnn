@@ -197,3 +197,71 @@ class PeriodicConvolution(torch.nn.Module):
             out.div_(n_norm ** 0.5)
 
         return out                                                                                                   # [batch, point, channel]
+
+
+class SelfInteraction(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out):
+        from copy import deepcopy
+        from scipy.linalg import block_diag
+
+        super().__init__()
+        self.Rs_in = Rs_in
+        self.Rs_out = Rs_out
+
+        blocks = []
+
+        Rs_in = deepcopy(Rs_in)
+        Rs_out = deepcopy(Rs_out)
+
+        # Store to convert multiplicity rep to full channel rep
+        full_in = [np.ones([1, 2 * L + 1]) for mul, L in Rs_in for m in range(mul)]
+        full_out = [np.ones([1, 2 * L + 1]) for mul, L in Rs_out for m in range(mul)]
+
+        # Get form of block diagonals
+        while len(Rs_in) != 0 or len(Rs_out) != 0:
+            mul_in, L_in = Rs_in[0] if len(Rs_in) != 0 else (0, np.inf)
+            mul_out, L_out = Rs_out[0] if len(Rs_out) != 0 else (0, np.inf)
+            if L_in > L_out:
+                blocks.append([0, mul_out])
+                Rs_out.pop(0)
+            elif L_out > L_in:
+                blocks.append([mul_in, 0])
+                Rs_in.pop(0)
+            elif L_in == L_out:
+                blocks.append([mul_in, mul_out])
+                Rs_in.pop(0), Rs_out.pop(0)
+
+        eyes = []
+
+        # 3D block diagonal matrix
+        for mul_in, mul_out in blocks:
+            if mul_in != 0 and mul_out != 0:
+                eyes.append(np.eye(mul_in * mul_out).reshape(mul_in * mul_out, mul_in, mul_out))
+            else:
+                eyes.append(np.empty([0, mul_in, mul_out]))
+
+        eye_shapes = np.array([eye.shape for eye in eyes])
+
+        matrix = np.zeros([eye_shapes[:, 0].sum(), eye_shapes[:, 1].sum(), eye_shapes[:, 2].sum()])
+
+        i = 0
+        j = 0
+        k = 0
+
+        for eye in eyes:
+            a, b, c = eye.shape
+            matrix[i: i + a, j: j + b, k: k + c] += eye
+            i += a
+            j += b
+            k += c
+
+        print(matrix.shape, block_diag(*full_in).shape, block_diag(*full_out).shape)
+
+        matrix = np.einsum('ijk,ja,kb->iab', matrix, block_diag(*full_in), block_diag(*full_out))
+        print(matrix.shape)
+
+        self.register_buffer('helper', torch.from_numpy(matrix))
+        self.weights = torch.nn.Parameter(torch.randn(matrix.shape[0]))
+
+    def forward(self, input):
+        return torch.einsum('w,wji,zaj->zai', (self.weights, self.helper, input))
