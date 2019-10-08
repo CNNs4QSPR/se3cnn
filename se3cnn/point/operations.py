@@ -231,9 +231,8 @@ class SelfInteraction(torch.nn.Module):
                 blocks.append([mul_in, mul_out])
                 Rs_in.pop(0), Rs_out.pop(0)
 
-        eyes = []
-
         # 3D block diagonal matrix
+        eyes = []
         for mul_in, mul_out in blocks:
             if mul_in != 0 and mul_out != 0:
                 eyes.append(np.eye(mul_in * mul_out).reshape(mul_in * mul_out, mul_in, mul_out))
@@ -241,13 +240,9 @@ class SelfInteraction(torch.nn.Module):
                 eyes.append(np.empty([0, mul_in, mul_out]))
 
         eye_shapes = np.array([eye.shape for eye in eyes])
-
         matrix = np.zeros([eye_shapes[:, 0].sum(), eye_shapes[:, 1].sum(), eye_shapes[:, 2].sum()])
 
-        i = 0
-        j = 0
-        k = 0
-
+        i, j, k = (0, 0, 0)
         for eye in eyes:
             a, b, c = eye.shape
             matrix[i: i + a, j: j + b, k: k + c] += eye
@@ -255,11 +250,7 @@ class SelfInteraction(torch.nn.Module):
             j += b
             k += c
 
-        print(matrix.shape, block_diag(*full_in).shape, block_diag(*full_out).shape)
-
         matrix = np.einsum('ijk,ja,kb->iab', matrix, block_diag(*full_in), block_diag(*full_out))
-        print(matrix.shape)
-
         self.register_buffer('helper', torch.from_numpy(matrix))
         self.weights = torch.nn.Parameter(torch.randn(matrix.shape[0]))
 
