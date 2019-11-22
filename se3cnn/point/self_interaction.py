@@ -73,8 +73,8 @@ class ConvolutionPlusSelfInteraction(torch.nn.Module):
         self.convolution = Convolution(Rs_in, Rs_out)
         self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
 
-    def forward(self, input, geometry):
-        output_conv = self.convolution(input, geometry)
+    def forward(self, input, geometry, n_norm=1):
+        output_conv = self.convolution(input, geometry, n_norm)
         output_si = self.selfinteraction(input)
         return output_conv + output_si
 
