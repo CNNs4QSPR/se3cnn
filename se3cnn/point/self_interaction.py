@@ -69,6 +69,7 @@ class SelfInteraction(torch.nn.Module):
 
 class ConvolutionPlusSelfInteraction(torch.nn.Module):
     def __init__(self, Convolution, SelfInteraction, Rs_in, Rs_out):
+        super().__init__()
         self.convolution = Convolution(Rs_in, Rs_out)
         self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
 
@@ -80,6 +81,7 @@ class ConvolutionPlusSelfInteraction(torch.nn.Module):
 
 class ApplyKernelPlusSelfInteraction(torch.nn.Module):
     def __init__(self, ApplyKernel, SelfInteraction, Rs_in, Rs_out):
+        super().__init__()
         self.applykernel = ApplyKernel(Rs_in, Rs_out)
         self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
 
