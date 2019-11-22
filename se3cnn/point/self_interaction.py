@@ -49,7 +49,9 @@ class ConcatenateSphericalSignals(torch.nn.Module):
 class SelfInteraction(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out):
         super().__init__()
-        self.kernel = Kernel(Rs_in, Rs_out, ConstantRadialModel)
+        self.kernel = Kernel(Rs_in, Rs_out, ConstantRadialModel,
+                             get_l_filters=lambda l_in, l_out: [0] if l_in ==
+                             l_out else [])
 
     def forward(self, features):
         """
@@ -63,3 +65,27 @@ class SelfInteraction(torch.nn.Module):
         features = torch.einsum("zij,zj->zi", (k, features))
         features = features.view(*size, -1)
         return features
+
+
+class ConvolutionPlusSelfInteraction(torch.nn.Module):
+    def __init__(self, Convolution, SelfInteraction, Rs_in, Rs_out):
+        self.convolution = Convolution(Rs_in, Rs_out)
+        self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
+
+    def forward(self, input, geometry):
+        output_conv = self.convolution(input, geometry)
+        output_si = self.selfinteraction(input)
+        return output_conv + output_si
+
+
+class ApplyKernelPlusSelfInteration(torch.nn.Module):
+    def __init__(self, ApplyKernel, SelfInteraction, Rs_in, Rs_out):
+        self.applykernel = ApplyKernel(Rs_in, Rs_out)
+        self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
+
+    def forward(self, input, geometry):
+        output_applykernel = self.applykernel(input, geometry)  # zabi
+        output_si = self.selfinteraction(input)  # zai
+        batch, N, _ = output_si.shape
+        I = torch.eye(N).unsqueeze(0).unsqueeze(-1)
+        return output_applykernel + I * output_si.unsqueeze(-2)  # zabi
