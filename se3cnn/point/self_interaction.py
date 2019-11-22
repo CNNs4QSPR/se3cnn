@@ -78,7 +78,7 @@ class ConvolutionPlusSelfInteraction(torch.nn.Module):
         return output_conv + output_si
 
 
-class ApplyKernelPlusSelfInteration(torch.nn.Module):
+class ApplyKernelPlusSelfInteraction(torch.nn.Module):
     def __init__(self, ApplyKernel, SelfInteraction, Rs_in, Rs_out):
         self.applykernel = ApplyKernel(Rs_in, Rs_out)
         self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
