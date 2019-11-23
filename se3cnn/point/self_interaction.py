@@ -1,11 +1,52 @@
 # pylint: disable=arguments-differ, no-member, missing-docstring, invalid-name, line-too-long
 from functools import reduce
+from collections import defaultdict
 
 import torch
 
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import ConstantRadialModel
 
+
+def simplify_Rs(Rs):
+    # return simplifed Rs and transformation matrix
+    # currently ignores parity
+    try:
+        mults, Ls, ps = zip(*Rs)
+    except:
+        mults, Ls = zip(*Rs)
+    totals = [mult * (2 * L + 1) for mult, L, p in Rs]
+    shuffle = torch.zeros(sum(totals), sum(totals))
+    
+    # Get total number of multiplicities by L
+    d = defaultdict(int)
+    for mult, L, p in Rs:
+        d[L] += mult
+        
+    # Rs_new grouped and sorted by L
+    Rs_new = sorted([x[::-1] for x in d.items()], key=lambda x: x[1])
+    new_mults, new_Ls = zip(*Rs_new)
+    new_totals = [mult * (2 * L + 1) for mult, L in Rs_new]
+    
+    # indices for different mults
+    tot_indices = [[sum(totals[0:i]), sum(totals[0:i + 1])] for i in range(len(totals))]
+    new_tot_indices = [[sum(new_totals[0:i]), sum(new_totals[0:i + 1])] for i in range(len(new_totals))]
+
+    # group indices by L
+    d_t_i = defaultdict(list)
+    for L, index in zip(Ls, tot_indices):
+        d_t_i[L].append(index)
+    
+    # 
+    total_bounds = sorted(list(d_t_i.items()), key=lambda x: x[0])
+    new_total_bounds = list(zip(new_Ls, new_tot_indices))
+
+    for old_indices, (L, new_index) in zip(total_bounds, new_total_bounds):
+        old_indices_list = [torch.arange(i[0], i[1]) for i in old_indices[1]]
+        new_index_list = torch.arange(new_index[0], new_index[1])
+        shuffle[new_index_list, torch.cat(old_indices_list)] = 1
+    
+    return Rs_new, shuffle
 
 class SortSphericalSignals(torch.nn.Module):
     def __init__(self, Rs):
