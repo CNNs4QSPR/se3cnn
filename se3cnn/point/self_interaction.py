@@ -126,9 +126,9 @@ class ApplyKernelPlusSelfInteraction(torch.nn.Module):
         self.applykernel = ApplyKernel(Rs_in, Rs_out)
         self.selfinteraction = SelfInteraction(Rs_in, Rs_out)
 
-    def forward(self, input, geometry):
-        output_applykernel = self.applykernel(input, geometry)  # zabi
+    def forward(self, input, geometry, _n_norm=1):
+        output_applykernel = self.applykernel(input, geometry, _n_norm)  # zabi
         output_si = self.selfinteraction(input)  # zai
         batch, N, _ = output_si.shape
-        I = torch.eye(N).unsqueeze(0).unsqueeze(-1)
+        I = torch.eye(N, device=input.device).unsqueeze(0).unsqueeze(-1)
         return output_applykernel + I * output_si.unsqueeze(-2)  # zabi
