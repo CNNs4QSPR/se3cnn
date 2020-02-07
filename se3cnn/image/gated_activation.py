@@ -1,9 +1,11 @@
 # pylint: disable=C,R,E1101
 from functools import partial
 import torch
-from se3cnn import SE3Convolution, SE3BNConvolution, SE3GNConvolution
-from se3cnn.non_linearities import ScalarActivation
-from se3cnn import kernel
+from se3cnn.image.batchnorm import SE3BNConvolution
+from se3cnn.image.convolution import SE3Convolution
+from se3cnn.image.groupnorm import SE3GNConvolution
+from se3cnn.non_linearities.scalar_activation import ScalarActivation
+from se3cnn.image import kernel
 
 
 class GatedActivation(torch.nn.Module):
