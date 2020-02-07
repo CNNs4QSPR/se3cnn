@@ -6,7 +6,7 @@ from se3cnn.image.convolution import SE3Convolution
 from se3cnn.image.groupnorm import SE3GNConvolution
 from se3cnn.non_linearities import NormSoftplus
 from se3cnn.dropout import SE3Dropout
-from se3cnn import kernel
+from se3cnn.image import kernel
 
 
 class NormBlock(torch.nn.Module):
